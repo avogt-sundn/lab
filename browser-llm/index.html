@@ -266,7 +266,7 @@
 
 <div id="status-bar">
   <div class="dot loading" id="status-dot"></div>
-  <span id="progress-text">Loading model… (first visit ~720 MB download, cached after that)</span>
+  <span id="progress-text">Loading model… (WebGPU: ~180 MB · WASM fallback: ~70 MB, cached after first visit)</span>
 </div>
 <div id="dl-bar"><div id="dl-bar-fill"></div></div>
 
@@ -651,8 +651,8 @@ RULES:
     }
   }
 
-  async function loadModel(device) {
-    return pipeline('text-generation', 'HuggingFaceTB/SmolLM2-360M-Instruct', {
+  async function loadModel(modelId, device) {
+    return pipeline('text-generation', modelId, {
       dtype: 'q4', device, progress_callback: onProgress,
     });
   }
@@ -660,10 +660,10 @@ RULES:
   async function init() {
     updateChips();
     try {
-      generator = await loadModel('webgpu');
+      generator = await loadModel('HuggingFaceTB/SmolLM2-360M-Instruct', 'webgpu');
     } catch {
-      setStatus('loading', 'WebGPU unavailable, falling back to WASM (slower)…');
-      generator = await loadModel('wasm');
+      setStatus('loading', 'WebGPU unavailable, falling back to WASM with smaller model…');
+      generator = await loadModel('HuggingFaceTB/SmolLM2-135M-Instruct', 'wasm');
     }
 
     ready = true;
