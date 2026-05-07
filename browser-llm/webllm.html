@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PizzAI — WebLLM</title>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, sans-serif;
+      background: #1a1a1a;
+      color: #f0ece4;
+      display: flex;
+      flex-direction: column;
+      height: 100dvh;
+    }
+
+    header {
+      background: #1a6b3c;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+    header h1 { font-size: 1.25rem; letter-spacing: 0.03em; }
+    header span { font-size: 1.6rem; }
+    #back-btn {
+      background: rgba(255,255,255,0.1); border: none;
+      border-radius: 6px; color: #fff; font-size: 0.75rem; padding: 4px 10px;
+      cursor: pointer; opacity: 0.7; text-decoration: none;
+    }
+    #back-btn:hover { opacity: 1; }
+    #toggle-log {
+      margin-left: auto; background: rgba(255,255,255,0.1); border: none;
+      border-radius: 6px; color: #fff; font-size: 0.75rem; padding: 4px 10px;
+      cursor: pointer; opacity: 0.7;
+    }
+    #toggle-log:hover { opacity: 1; }
+
+    #status-bar {
+      background: #111;
+      font-size: 0.75rem;
+      color: #aaa;
+      padding: 6px 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+      min-height: 32px;
+    }
+    #status-bar .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #555; flex-shrink: 0;
+    }
+    #status-bar .dot.loading { background: #f39c12; animation: pulse 1s infinite; }
+    #status-bar .dot.ready   { background: #27ae60; }
+    #status-bar .dot.error   { background: #c0392b; }
+    #progress-text { flex: 1; }
+    #runtime-badge {
+      font-size: 0.68rem; background: #2ecc71; color: #1a1a1a;
+      padding: 1px 7px; border-radius: 8px; font-weight: 600; flex-shrink: 0;
+    }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+
+    #dl-bar {
+      height: 3px;
+      background: #2a2a2a;
+      flex-shrink: 0;
+      overflow: hidden;
+    }
+    #dl-bar-fill {
+      height: 100%;
+      background: #2ecc71;
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    #dl-bar.done { height: 0; transition: height 0.4s ease 0.5s; }
+
+    #order-bar {
+      background: #1e1e1e;
+      border-bottom: 1px solid #333;
+      font-size: 0.78rem;
+      color: #ccc;
+      padding: 5px 20px;
+      display: none;
+      align-items: center;
+      gap: 16px;
+      flex-shrink: 0;
+      flex-wrap: wrap;
+    }
+    #order-bar.visible { display: flex; }
+    #order-bar .ob-label { color: #888; }
+    #order-bar .ob-items { color: #f0ece4; font-weight: 500; }
+    #order-bar .ob-total { color: #27ae60; font-weight: 700; margin-left: auto; }
+    #order-bar .ob-clear {
+      background: none; border: none; color: #666; cursor: pointer;
+      font-size: 0.75rem; padding: 2px 6px; border-radius: 4px;
+    }
+    #order-bar .ob-clear:hover { color: #1a6b3c; }
+
+    #step-hint {
+      padding: 6px 20px 0;
+      font-size: 0.75rem;
+      color: #888;
+      flex-shrink: 0;
+      display: none;
+    }
+    #step-hint.visible { display: block; }
+    #step-hint strong { color: #2ecc71; }
+
+    #chat {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .msg {
+      max-width: 72%;
+      padding: 10px 14px;
+      border-radius: 16px;
+      line-height: 1.5;
+      font-size: 0.92rem;
+    }
+    .msg.user {
+      align-self: flex-end;
+      background: #1a6b3c;
+      border-bottom-right-radius: 4px;
+      white-space: pre-wrap;
+    }
+    .msg.assistant {
+      align-self: flex-start;
+      background: #2c2c2c;
+      border-bottom-left-radius: 4px;
+    }
+    .msg.assistant strong { color: #fff; font-weight: 700; }
+    .msg.assistant em { color: #ddd; }
+    .msg.assistant ul, .msg.assistant ol { padding-left: 1.3em; margin: 4px 0; }
+    .msg.assistant li { margin: 2px 0; }
+    .msg.assistant p { margin-bottom: 0.4em; }
+    .msg.assistant p:last-child { margin-bottom: 0; }
+    .msg.assistant code {
+      background: #1a1a1a; border-radius: 3px; padding: 1px 4px; font-size: 0.85em;
+    }
+    .msg.assistant.streaming::after {
+      content: '▌';
+      display: inline-block;
+      animation: blink 0.7s steps(1) infinite;
+      color: #2ecc71;
+    }
+    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+
+    .msg.system {
+      align-self: center;
+      background: transparent;
+      color: #888;
+      font-size: 0.8rem;
+      font-style: italic;
+      max-width: 100%;
+      text-align: center;
+    }
+
+    #suggestions {
+      padding: 0 20px 10px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .chip {
+      background: #2c2c2c;
+      border: 1px solid #444;
+      border-radius: 20px;
+      padding: 6px 14px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      color: #f0ece4;
+      transition: background 0.15s;
+    }
+    .chip:hover { background: #3a3a3a; }
+    .chip:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    #prompt-log {
+      border-top: 1px solid #333;
+      background: #0d0d0d;
+      font-size: 0.72rem;
+      font-family: monospace;
+      flex-shrink: 0;
+      max-height: 220px;
+      overflow-y: auto;
+      display: none;
+    }
+    #prompt-log.visible { display: block; }
+    #prompt-log-header {
+      position: sticky;
+      top: 0;
+      background: #0d0d0d;
+      padding: 5px 16px;
+      color: #666;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #222;
+    }
+    #prompt-log-header span { flex: 1; }
+    #prompt-log-header button {
+      background: none; border: none; color: #555; cursor: pointer; font-size: 0.7rem;
+    }
+    #prompt-log-header button:hover { color: #aaa; }
+    .pl-entry { border-bottom: 1px solid #1a1a1a; padding: 6px 16px; }
+    .pl-entry summary {
+      cursor: pointer; color: #666; user-select: none; padding: 2px 0;
+      list-style: none; display: flex; gap: 8px; align-items: baseline;
+    }
+    .pl-entry summary::-webkit-details-marker { display: none; }
+    .pl-entry summary::before { content: '▶'; font-size: 0.6rem; color: #555; }
+    .pl-entry[open] summary::before { content: '▼'; }
+    .pl-entry summary .pl-seq { color: #2ecc71; font-weight: 700; }
+    .pl-entry summary .pl-meta { color: #555; }
+    .pl-messages { margin-top: 4px; }
+    .pl-msg { margin: 4px 0; }
+    .pl-msg .pl-role { font-weight: 700; margin-right: 6px; }
+    .pl-msg.pl-system .pl-role { color: #7ecbff; }
+    .pl-msg.pl-user   .pl-role { color: #1a6b3c; }
+    .pl-msg.pl-assistant .pl-role { color: #27ae60; }
+    .pl-msg .pl-body { color: #aaa; white-space: pre-wrap; word-break: break-word; }
+
+    #input-row {
+      display: flex;
+      gap: 10px;
+      padding: 12px 20px 16px;
+      flex-shrink: 0;
+      background: #111;
+    }
+    #user-input {
+      flex: 1;
+      background: #2c2c2c;
+      border: 1px solid #444;
+      border-radius: 24px;
+      padding: 10px 16px;
+      color: #f0ece4;
+      font-size: 0.92rem;
+      outline: none;
+    }
+    #user-input:focus { border-color: #1a6b3c; }
+    #send-btn, #stop-btn {
+      border: none;
+      border-radius: 24px;
+      padding: 10px 20px;
+      color: #fff;
+      font-size: 0.92rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    #send-btn { background: #1a6b3c; }
+    #send-btn:hover:not(:disabled) { background: #155f34; }
+    #send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    #stop-btn { background: #555; display: none; }
+    #stop-btn:hover { background: #666; }
+  </style>
+</head>
+<body>
+
+<header>
+  <span>🍕</span>
+  <h1>PizzAI — Napoli Express</h1>
+  <a id="back-btn" href="index.html">← Runtimes</a>
+  <button id="toggle-log" onclick="toggleLog()">🔬 Prompt log</button>
+</header>
+
+<div id="status-bar">
+  <div class="dot loading" id="status-dot"></div>
+  <span id="progress-text">Loading model… (first visit ~240 MB download, cached after that)</span>
+  <span id="runtime-badge">⚡ WebLLM</span>
+</div>
+<div id="dl-bar"><div id="dl-bar-fill"></div></div>
+
+<div id="order-bar">
+  <span class="ob-label">Order:</span>
+  <span class="ob-items" id="ob-items"></span>
+  <span class="ob-total" id="ob-total"></span>
+  <button class="ob-clear" onclick="clearOrder()">✕ clear</button>
+</div>
+
+<div id="chat">
+  <div class="msg system">All inference runs locally in your browser. Nothing is sent to any server.</div>
+</div>
+
+<div id="step-hint"></div>
+
+<div id="suggestions"></div>
+
+<div id="prompt-log" class="visible">
+  <div id="prompt-log-header">
+    <span>🔬 Prompt log</span>
+    <button onclick="document.getElementById('prompt-log').classList.remove('visible')">✕</button>
+  </div>
+  <div id="prompt-log-entries"></div>
+</div>
+
+<div id="input-row">
+  <input id="user-input" type="text" placeholder="Ask about our menu, order a pizza, or check delivery times…" disabled />
+  <button id="send-btn" disabled onclick="sendMessage()">Send</button>
+  <button id="stop-btn" onclick="requestStop()">Stop</button>
+</div>
+
+<script type="module">
+  import * as webllm from 'https://esm.run/@mlc-ai/web-llm';
+
+  const MODEL_ID = 'SmolLM2-360M-Instruct-q4f16_1-MLC';
+
+  // ── Business data ──────────────────────────────────────────────────────────
+
+  const MENU = [
+    { id: 'marg',    name: 'Margherita',       desc: 'tomato, mozzarella, basil',                tags: ['V'],        prices: { S: 8,  M: 11, L: 14 }, prep: 10 },
+    { id: 'diav',    name: 'Diavola',           desc: 'spicy salami, tomato, mozzarella',         tags: [],           prices: { S: 10, M: 13, L: 16 }, prep: 12 },
+    { id: 'quat',    name: 'Quattro Stagioni',  desc: 'ham, artichoke, mushroom, olive',          tags: [],           prices: { S: 11, M: 14, L: 17 }, prep: 14 },
+    { id: 'orto',    name: 'Ortolana',          desc: 'grilled zucchini, peppers, aubergine',     tags: ['V', 'VG'],  prices: { S: 10, M: 13, L: 16 }, prep: 12 },
+    { id: 'napo',    name: 'Napoletana',        desc: 'anchovy, caper, olive, tomato',            tags: [],           prices: { S: 9,  M: 12, L: 15 }, prep: 10 },
+    { id: 'fung',    name: 'Funghi',            desc: 'mixed mushrooms, truffle oil, mozzarella', tags: ['V'],        prices: { S: 9,  M: 12, L: 15 }, prep: 11 },
+    { id: 'bufa',    name: 'Bufalina',          desc: 'buffalo mozzarella, cherry tomato, basil', tags: ['V'],        prices: { S: 11, M: 14, L: 17 }, prep: 10 },
+    { id: 'cala',    name: 'Calabrese',         desc: 'nduja, red onion, provola',                tags: [],           prices: { S: 10, M: 13, L: 16 }, prep: 12 },
+    { id: 'gfmarg',  name: 'Margherita GF',     desc: 'GF base, tomato, mozzarella, basil',       tags: ['V', 'GF'],  prices: { S: 10, M: 13, L: 16 }, prep: 13 },
+    { id: 'green',   name: 'Green Garden',      desc: 'GF base, cashew cream, spinach, artichoke',tags: ['VG', 'GF'], prices: { S: 12, M: 15, L: 18 }, prep: 15 },
+  ];
+
+  const ZONES = [
+    { id: 'near', label: 'Centro (< 2 km)',    mins: 10, fee: 0 },
+    { id: 'mid',  label: 'Medio (2–5 km)',     mins: 20, fee: 2 },
+    { id: 'far',  label: 'Periferia (5–8 km)', mins: 30, fee: 4 },
+  ];
+
+  const BUSINESS = {
+    openHour: 11, closeHour: 22, lastOrderMinsBefore: 30,
+    peakHours: [12, 13, 19, 20, 21], peakMultiplier: 1.4,
+    minFreeDelivery: 25, totalDrivers: 4,
+  };
+
+  const DAILY_SPECIALS = [
+    'Sunday: **Margherita** Medium at Small price',
+    'Monday: **Funghi** — free truffle drizzle upgrade',
+    'Tuesday: **Diavola** — 2-for-1 on Large',
+    'Wednesday: **Ortolana** — €2 off any size',
+    'Thursday: **Bufalina** — free size upgrade S→M',
+    'Friday: **Calabrese** — free garlic bread',
+    'Saturday: **Quattro Stagioni** Large — €3 off',
+  ];
+
+  // ── Simulation helpers ─────────────────────────────────────────────────────
+
+  function getDriverState() {
+    const now = new Date();
+    const seed = now.getHours() * 60 + now.getMinutes();
+    const available = Math.max(1, BUSINESS.totalDrivers - Math.floor((seed % 7) / 2));
+    const nextFreeIn = available < BUSINESS.totalDrivers ? 5 + (seed % 18) : 0;
+    return { available, nextFreeIn };
+  }
+
+  function isOpen() {
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes();
+    if (h < BUSINESS.openHour) return false;
+    if (h > BUSINESS.closeHour) return false;
+    if (h === BUSINESS.closeHour) return false;
+    if (h === BUSINESS.closeHour - 1 && m >= (60 - BUSINESS.lastOrderMinsBefore)) return false;
+    return true;
+  }
+
+  function isPeak() {
+    return BUSINESS.peakHours.includes(new Date().getHours());
+  }
+
+  // ── Order state ────────────────────────────────────────────────────────────
+
+  let orderState = { phase: 'browsing', items: [], zone: null, confirmed: false };
+
+  function resetOrder() {
+    orderState = { phase: 'browsing', items: [], zone: null, confirmed: false };
+  }
+
+  function orderSubtotal() {
+    return orderState.items.reduce((s, i) => s + i.price * i.qty, 0);
+  }
+
+  function calculateEstimate() {
+    if (!orderState.items.length || !orderState.zone) return null;
+    const mult = isPeak() ? BUSINESS.peakMultiplier : 1.0;
+    const prepTimes = orderState.items.map(i => {
+      const pizza = MENU.find(m => m.id === i.id);
+      return (pizza?.prep ?? 12) * mult;
+    });
+    const maxPrep = Math.max(...prepTimes);
+    const totalQty = orderState.items.reduce((s, i) => s + i.qty, 0);
+    const extraPizzas = Math.max(0, totalQty - 3);
+    const prepMins = Math.ceil(maxPrep + extraPizzas * 3);
+    const zone = ZONES.find(z => z.id === orderState.zone);
+    const drivers = getDriverState();
+    const driverWait = drivers.available > 0 ? 0 : drivers.nextFreeIn;
+    return {
+      prep: prepMins,
+      delivery: zone.mins,
+      driverWait,
+      total: prepMins + zone.mins + driverWait,
+      fee: zone.fee,
+    };
+  }
+
+  function parseUserIntent(text) {
+    const lower = text.toLowerCase();
+
+    if (/start over|cancel order|clear order|new order/i.test(lower)) {
+      resetOrder();
+      updateChips();
+      updateOrderBar();
+      return;
+    }
+
+    for (const pizza of MENU) {
+      if (lower.includes(pizza.name.toLowerCase()) || lower.includes(pizza.id)) {
+        const size = /\blarge\b|grande/i.test(lower) ? 'L' : /\bsmall\b|piccol/i.test(lower) ? 'S' : 'M';
+        const qtyMatch = lower.match(/(\d+)\s*x\b/) || lower.match(/\b(\d+)\s+(?:of\s+)?(?:the\s+)?(?:a\s+)?/i);
+        const qty = qtyMatch ? Math.min(parseInt(qtyMatch[1], 10), 10) : 1;
+        const existing = orderState.items.find(i => i.id === pizza.id && i.size === size);
+        if (existing) {
+          existing.qty += qty;
+        } else {
+          orderState.items.push({ id: pizza.id, name: pizza.name, size, qty, price: pizza.prices[size] });
+        }
+        if (orderState.phase === 'browsing') orderState.phase = 'selecting';
+      }
+    }
+
+    if (/\bcentro\b|city.?cent|< ?2\s*km|\bnear\b/i.test(lower)) {
+      orderState.zone = 'near';
+      if (orderState.items.length) orderState.phase = 'address';
+    } else if (/\bmedio\b|2.?5\s*km|\bmid\b/i.test(lower)) {
+      orderState.zone = 'mid';
+      if (orderState.items.length) orderState.phase = 'address';
+    } else if (/\bperif/i.test(lower) || /5.?8\s*km/i.test(lower) || /\bfar\b/i.test(lower)) {
+      orderState.zone = 'far';
+      if (orderState.items.length) orderState.phase = 'address';
+    }
+
+    if (/that.?s (all|it)|done.*order|finish.*order|ready.*order/i.test(lower)) {
+      if (orderState.items.length && !orderState.zone) {
+        orderState.phase = 'address';
+      }
+    }
+
+    if (/\bconfirm\b|place.*order|yes.*confirm|order.*confirm/i.test(lower)) {
+      if (orderState.items.length && orderState.zone) {
+        orderState.phase = 'confirmed';
+        orderState.confirmed = true;
+      }
+    }
+
+    updateChips();
+    updateOrderBar();
+  }
+
+  // ── System prompt ──────────────────────────────────────────────────────────
+
+  function buildSystemPrompt() {
+    const now = new Date();
+    const h = now.getHours(), m = now.getMinutes();
+    const timeStr = `${h}:${String(m).padStart(2, '0')}`;
+    const drivers = getDriverState();
+    const open = isOpen();
+    const peak = isPeak();
+    const special = DAILY_SPECIALS[now.getDay()];
+
+    const activePromos = [];
+    if (h >= 15 && h < 17) activePromos.push('Happy Hour -15%');
+    activePromos.push('2 Medium pizzas + drink = -€3', `Free delivery on orders over €${BUSINESS.minFreeDelivery}`);
+
+    const menuLines = MENU.map(p =>
+      `${p.name}${p.tags.length ? ' [' + p.tags.join(',') + ']' : ''}: S€${p.prices.S}/M€${p.prices.M}/L€${p.prices.L} — ${p.desc}`
+    ).join('\n');
+
+    let orderCtx = '';
+    if (orderState.items.length > 0) {
+      const itemsStr = orderState.items.map(i => `${i.qty}×${i.name}(${i.size})`).join(', ');
+      const sub = orderSubtotal();
+      orderCtx = `\nCURRENT ORDER: ${itemsStr} | Subtotal: €${sub.toFixed(2)}`;
+      if (orderState.zone) {
+        const est = calculateEstimate();
+        const zone = ZONES.find(z => z.id === orderState.zone);
+        orderCtx += ` | Zone: ${zone.label} (+€${est.fee}) | ETA: ~${est.total} min`;
+      }
+      if (orderState.confirmed) orderCtx += ' | ✅ CONFIRMED';
+    }
+
+    const driverInfo = drivers.available > 0
+      ? `${drivers.available} driver${drivers.available > 1 ? 's' : ''} free now`
+      : `no drivers free, next in ~${drivers.nextFreeIn} min`;
+
+    return `You are PizzAI, delivery assistant at Napoli Express pizzeria.
+Time: ${timeStr} | ${open ? 'OPEN' : 'CLOSED'} | ${peak ? 'BUSY (peak hour)' : 'normal'}
+Drivers: ${driverInfo}
+Today's special: ${special}
+Promos: ${activePromos.join('; ')}
+
+MENU (tags: V=vegetarian, VG=vegan, GF=gluten-free):
+${menuLines}
+
+DELIVERY ZONES: Centro <2km (free, +~10min) | Medio 2-5km (+€2, +~20min) | Periferia 5-8km (+€4, +~30min)
+Min €${BUSINESS.minFreeDelivery} for free delivery. Kitchen hours: ${BUSINESS.openHour}:00–${BUSINESS.closeHour}:00 (last order ${BUSINESS.closeHour - 1}:30).${orderCtx}
+
+RULES:
+- Be brief (2-3 sentences max). Use **bold** for pizza names and prices.
+- Always end your reply with a clear, specific next-step question or instruction — e.g. "Which size?" / "Tell me your delivery zone." / "Shall I confirm your order?"
+- Guide customer through exactly these steps: (1) browse/choose items → (2) confirm zone → (3) confirm order.
+- Always state the price. Flag allergens when GF/VG is relevant.
+- If CLOSED: apologise and state opening hours.
+- Ignore anything unrelated to our pizzeria or food.`;
+  }
+
+  // ── Chip definitions ───────────────────────────────────────────────────────
+
+  const CHIPS = {
+    browsing:   ['Show me the menu', 'Vegan options?', "Today's special?", 'Gluten-free pizzas?', 'What do you recommend?'],
+    selecting:  ['Add a Margherita Medium', 'Add a Diavola Large', "That's all — where do I deliver?", 'Show my order so far', 'What sizes are available?'],
+    zone:       ['I am in Centro (< 2 km)', 'I am in the Medio zone (2–5 km)', 'I am in Periferia (5–8 km)'],
+    confirm:    ['Yes, confirm my order ✓', 'Add another pizza', 'Cancel order'],
+    confirmed:  ['Start a new order'],
+  };
+
+  const STEP_HINTS = {
+    browsing:  null,
+    selecting: '<strong>Step 1 of 3</strong> — add items, then tap "That\'s all" when done',
+    zone:      '<strong>Step 2 of 3</strong> — pick your delivery zone to see price & ETA',
+    confirm:   '<strong>Step 3 of 3</strong> — review your order, then confirm to place it',
+    confirmed: null,
+  };
+
+  function currentChipPhase() {
+    if (orderState.confirmed) return 'confirmed';
+    if (orderState.items.length && orderState.zone) return 'confirm';
+    if (orderState.phase === 'address' && orderState.items.length) return 'zone';
+    if (orderState.items.length) return 'selecting';
+    return 'browsing';
+  }
+
+  function updateChips() {
+    const phase = currentChipPhase();
+    const suggestionsEl = document.getElementById('suggestions');
+    suggestionsEl.innerHTML = '';
+    for (const text of CHIPS[phase] ?? CHIPS.browsing) {
+      const btn = document.createElement('button');
+      btn.className = 'chip';
+      btn.textContent = text;
+      btn.onclick = () => quickSend(btn);
+      suggestionsEl.appendChild(btn);
+    }
+
+    const hintEl = document.getElementById('step-hint');
+    const hint = STEP_HINTS[phase] ?? null;
+    if (hint) {
+      hintEl.innerHTML = hint;
+      hintEl.classList.add('visible');
+    } else {
+      hintEl.classList.remove('visible');
+    }
+  }
+
+  function updateOrderBar() {
+    const bar = document.getElementById('order-bar');
+    if (!orderState.items.length) {
+      bar.classList.remove('visible');
+      return;
+    }
+    bar.classList.add('visible');
+    const itemsEl = document.getElementById('ob-items');
+    const totalEl = document.getElementById('ob-total');
+    const qtyTotal = orderState.items.reduce((s, i) => s + i.qty, 0);
+    itemsEl.textContent = orderState.items.map(i => `${i.qty}× ${i.name} (${i.size})`).join(', ');
+    const sub = orderSubtotal();
+    const zone = orderState.zone ? ZONES.find(z => z.id === orderState.zone) : null;
+    const fee = zone ? zone.fee : null;
+    const total = fee !== null ? sub + fee : sub;
+    totalEl.textContent = fee !== null
+      ? `€${total.toFixed(2)} incl. €${fee} delivery`
+      : `€${sub.toFixed(2)} (+delivery)`;
+    bar.querySelector('.ob-label').textContent = `${qtyTotal} pizza${qtyTotal > 1 ? 's' : ''}:`;
+  }
+
+  // ── Model & conversation ───────────────────────────────────────────────────
+
+  const history = [];
+  let engine = null;
+  let ready = false;
+  let stopRequested = false;
+  let abortController = null;
+
+  const statusDot    = document.getElementById('status-dot');
+  const progressText = document.getElementById('progress-text');
+  const dlBar        = document.getElementById('dl-bar');
+  const dlBarFill    = document.getElementById('dl-bar-fill');
+  const input        = document.getElementById('user-input');
+  const sendBtn      = document.getElementById('send-btn');
+  const stopBtn      = document.getElementById('stop-btn');
+  const chatEl       = document.getElementById('chat');
+
+  marked.use({ breaks: true });
+
+  function setStatus(state, text) {
+    statusDot.className = 'dot ' + state;
+    progressText.textContent = text;
+  }
+
+  function setBusy(busy) {
+    if (busy) {
+      sendBtn.style.display = 'none';
+      stopBtn.style.display = '';
+      input.disabled = true;
+      document.querySelectorAll('.chip').forEach(c => c.disabled = true);
+    } else {
+      stopBtn.style.display = 'none';
+      sendBtn.style.display = '';
+      sendBtn.disabled = false;
+      input.disabled = false;
+      input.focus();
+      document.querySelectorAll('.chip').forEach(c => c.disabled = false);
+    }
+  }
+
+  function addMsg(role, content) {
+    const div = document.createElement('div');
+    div.className = 'msg ' + role;
+    if (role === 'assistant') {
+      div.innerHTML = marked.parse(content);
+    } else {
+      div.textContent = content;
+    }
+    chatEl.appendChild(div);
+    chatEl.scrollTop = chatEl.scrollHeight;
+    return div;
+  }
+
+  async function init() {
+    updateChips();
+
+    engine = await webllm.CreateMLCEngine(MODEL_ID, {
+      initProgressCallback: (report) => {
+        const pct = Math.round(report.progress * 100);
+        dlBarFill.style.width = pct + '%';
+        setStatus('loading', report.text || `Loading — ${pct}%`);
+      },
+    });
+
+    ready = true;
+    dlBar.classList.add('done');
+    setStatus('ready', 'Model ready — running 100% locally in your browser');
+    setBusy(false);
+
+    addMsg('assistant', "Ciao! 👋 Welcome to **Napoli Express**. I'll take your delivery order in 3 steps: pick your pizzas → tell me your zone → confirm. Use the quick buttons below, or just type. **What would you like to order?**");
+  }
+
+  window.requestStop = function () {
+    stopRequested = true;
+    abortController?.abort();
+  };
+
+  window.clearOrder = function () {
+    resetOrder();
+    updateChips();
+    updateOrderBar();
+    addMsg('system', 'Order cleared. Start fresh anytime!');
+  };
+
+  let promptSeq = 0;
+
+  function logPrompt(messages) {
+    promptSeq++;
+    const entries = document.getElementById('prompt-log-entries');
+    const details = document.createElement('details');
+    details.className = 'pl-entry';
+    const totalChars = messages.reduce((s, m) => s + m.content.length, 0);
+    details.innerHTML = `<summary>
+      <span class="pl-seq">#${promptSeq}</span>
+      <span class="pl-meta">${messages.length} messages · ${totalChars} chars</span>
+    </summary>
+    <div class="pl-messages">${messages.map(m => `
+      <div class="pl-msg pl-${m.role}">
+        <span class="pl-role">[${m.role}]</span><span class="pl-body">${escHtml(m.content)}</span>
+      </div>`).join('')}
+    </div>`;
+    entries.appendChild(details);
+    entries.scrollTop = entries.scrollHeight;
+  }
+
+  function escHtml(s) {
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  window.toggleLog = function () {
+    document.getElementById('prompt-log').classList.toggle('visible');
+  };
+
+  async function generate(userText) {
+    parseUserIntent(userText);
+    history.push({ role: 'user', content: userText });
+
+    const trimmed = history.length > 8 ? history.slice(-8) : history;
+    const messages = [{ role: 'system', content: buildSystemPrompt() }, ...trimmed];
+    logPrompt(messages);
+
+    const assistantDiv = document.createElement('div');
+    assistantDiv.className = 'msg assistant streaming';
+    chatEl.appendChild(assistantDiv);
+    chatEl.scrollTop = chatEl.scrollHeight;
+
+    let streamBuffer = '';
+    stopRequested = false;
+    abortController = new AbortController();
+
+    const stream = await engine.chat.completions.create({
+      messages,
+      stream: true,
+      max_tokens: 256,
+      temperature: 0.7,
+      frequency_penalty: 0.1,
+    });
+
+    for await (const chunk of stream) {
+      if (stopRequested) break;
+      const delta = chunk.choices[0]?.delta?.content ?? '';
+      streamBuffer += delta;
+      assistantDiv.innerHTML = marked.parse(streamBuffer);
+      chatEl.scrollTop = chatEl.scrollHeight;
+    }
+
+    assistantDiv.classList.remove('streaming');
+    if (!stopRequested) {
+      assistantDiv.innerHTML = marked.parse(streamBuffer);
+    }
+
+    history.push({ role: 'assistant', content: streamBuffer });
+  }
+
+  window.sendMessage = async function () {
+    const text = input.value.trim();
+    if (!text || !ready) return;
+    input.value = '';
+    setBusy(true);
+    addMsg('user', text);
+    setStatus('loading', 'Generating…');
+
+    try {
+      await generate(text);
+    } catch (err) {
+      if (!stopRequested) {
+        addMsg('system', '⚠️ ' + err.message);
+        setStatus('error', 'Inference error');
+      }
+    } finally {
+      if (ready) {
+        setStatus('ready', 'Model ready — running 100% locally in your browser');
+        setBusy(false);
+      }
+    }
+  };
+
+  window.quickSend = function (btn) {
+    if (!ready) return;
+    input.value = btn.textContent;
+    sendMessage();
+  };
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  init();
+</script>
+</body>
+</html>
