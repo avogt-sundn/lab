@@ -1,0 +1,13 @@
+FROM mcr.microsoft.com/playwright:v1.52.0-jammy
+
+WORKDIR /tests
+
+COPY package.json ./
+RUN npm install
+
+COPY playwright.config.ts tsconfig.json* ./
+COPY playwright/ playwright/
+
+ENV BASE_URL=http://pizzai-web
+
+CMD ["npx", "playwright", "test"]

@@ -1,0 +1,55 @@
+## Stage 1: build native executable with Mandrel/GraalVM
+FROM quay.io/quarkus/ubi9-quarkus-mandrel-builder-image:jdk-21 AS build
+
+RUN mkdir -p $HOME/.m2 && cat > $HOME/.m2/settings.xml <<EOF
+<settings>
+  <mirrors>
+    <mirror>
+      <id>dockerized-mirror</id>
+      <name>Local Mirror Repository</name>
+      <url>http://localhost:8008/central</url>
+      <mirrorOf>central</mirrorOf>
+    </mirror>
+  </mirrors>
+</settings>
+EOF
+
+WORKDIR /code
+ENV DIR $HOME/.m2/repository
+COPY --chmod=0755 mvnw /code/mvnw
+COPY .mvn /code/.mvn
+COPY pom.xml /code/
+
+RUN --mount=type=cache,target=$DIR mkdir -p $DIR && echo "cached .m2 size: " $(du -sh $DIR)
+RUN --mount=type=cache,target=$DIR ./mvnw -B org.apache.maven.plugins:maven-dependency-plugin:3.8.1:go-offline
+
+COPY src /code/src
+RUN --mount=type=cache,target=$DIR ./mvnw package -Dnative -DskipTests
+
+## Stage 2: extract curl + CA certs for health checks
+FROM registry.access.redhat.com/ubi9/ubi-minimal AS curlbin
+RUN microdnf install -y \
+    curl-minimal \
+    ca-certificates \
+ && microdnf clean all
+
+## Stage 3: minimal native runtime image
+FROM quay.io/quarkus/ubi9-quarkus-micro-image:2.0
+
+WORKDIR /app/
+COPY --from=build /code/target/*-runner /app/application
+COPY --from=curlbin /usr/bin/curl /usr/bin/curl
+COPY --from=curlbin /etc/pki/ca-trust /etc/pki/ca-trust
+COPY --from=curlbin /etc/ssl/certs /etc/ssl/certs
+COPY --from=curlbin /usr/lib64 /usr/lib64
+ENV SSL_CERT_DIR=/etc/ssl/certs
+
+RUN chmod 775 /app /app/application \
+  && chown -R 1001 /app \
+  && chmod -R "g+rwX" /app \
+  && chown -R 1001:root /app
+
+EXPOSE 8081
+USER 1001
+
+CMD ["./application", "-Dquarkus.http.host=0.0.0.0", "-Dquarkus.http.port=8081"]

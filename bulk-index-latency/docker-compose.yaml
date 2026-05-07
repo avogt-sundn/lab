@@ -1,0 +1,93 @@
+networks:
+  default:
+    name: docker-default-network
+    external: true
+
+services:
+  elasticsearch-lab-bulk:
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.2.2
+    ports:
+      - "9200:9200"
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - cluster.routing.allocation.disk.threshold_enabled=false
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 30s
+    volumes:
+      - es-lab-bulk-data:/usr/share/elasticsearch/data
+
+  indexer-jvm:
+    build:
+      context: ./indexer
+      dockerfile: Dockerfile.jvm
+      network: host
+    depends_on:
+      elasticsearch-lab-bulk:
+        condition: service_healthy
+      postgres-lab:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres-lab
+      DB_NAME: app-lab-db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      ES_HOST: elasticsearch-lab-bulk
+      QUARKUS_HTTP_PORT: 8080
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/q/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+
+  indexer-native:
+    build:
+      context: ./indexer
+      dockerfile: Dockerfile.native
+      network: host
+    depends_on:
+      elasticsearch-lab-bulk:
+        condition: service_healthy
+      postgres-lab:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres-lab
+      DB_NAME: app-lab-db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      ES_HOST: elasticsearch-lab-bulk
+      QUARKUS_HTTP_PORT: 8081
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8081/q/health"]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 10s
+
+  proof-bulk-index-latency:
+    build:
+      context: .
+    depends_on:
+      indexer-jvm:
+        condition: service_healthy
+      indexer-native:
+        condition: service_healthy
+      postgres-lab:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres-lab
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: app-lab-db
+      INDEXER_JVM_URL: http://indexer-jvm:8080
+      INDEXER_NATIVE_URL: http://indexer-native:8081
+
+volumes:
+  es-lab-bulk-data:

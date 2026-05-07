@@ -1,0 +1,10 @@
+{
+  "name": "pizzai-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "devDependencies": {
+    "@playwright/test": "1.52.0",
+    "@types/node": "^25.6.0",
+    "typescript": "^6.0.3"
+  }
+}

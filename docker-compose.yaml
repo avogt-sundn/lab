@@ -1,7 +1,14 @@
+name: lab
+
 networks:
   default:
     name: docker-default-network
     external: true
+
+include:
+  - debezium-cdc/docker-compose.yaml
+  - bulk-index-latency/docker-compose.yaml
+  - browser-llm/docker-compose.yaml
 
 services:
   postgres-lab:
@@ -10,6 +17,8 @@ services:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: app-lab-db
+    # wal_level=logical is required by Debezium; harmless for other proofs
+    command: ["postgres", "-c", "wal_level=logical"]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
@@ -29,6 +38,11 @@ services:
       PGUSER: postgres
       PGPASSWORD: postgres
       PGDATABASE: app-lab-db
+    healthcheck:
+      test: ["CMD", "true"]
+      interval: 10s
+      timeout: 5s
+      retries: 1
 
 volumes:
   pg-lab-data:

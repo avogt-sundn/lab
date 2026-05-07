@@ -1,0 +1,26 @@
+networks:
+  default:
+    name: docker-default-network
+    external: true
+
+services:
+  pizzai-e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    depends_on:
+      pizzai-web:
+        condition: service_healthy
+    environment:
+      BASE_URL: http://pizzai-web
+
+  pizzai-web:
+    build:
+      context: .
+    ports:
+      - "8091:80"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5

@@ -1,0 +1,33 @@
+FROM maven:3.9.8-eclipse-temurin-21 AS build
+
+RUN mkdir -p $HOME/.m2 && cat > $HOME/.m2/settings.xml <<EOF
+<settings>
+  <mirrors>
+    <mirror>
+      <id>dockerized-mirror</id>
+      <name>Local Mirror Repository</name>
+      <url>http://localhost:8008/central</url>
+      <mirrorOf>central</mirrorOf>
+    </mirror>
+  </mirrors>
+</settings>
+EOF
+
+WORKDIR /code
+ENV DIR=/root/.m2/repository
+COPY --chmod=0755 mvnw /code/mvnw
+COPY .mvn /code/.mvn
+COPY pom.xml /code/
+
+RUN --mount=type=cache,target=$DIR mkdir -p $DIR && echo "cached .m2 size: " $(du -sh $DIR)
+RUN --mount=type=cache,target=$DIR ./mvnw -B org.apache.maven.plugins:maven-dependency-plugin:3.8.1:go-offline
+
+COPY src ./src
+RUN --mount=type=cache,target=$DIR ./mvnw -B package -DskipTests
+
+FROM eclipse-temurin:21-jre-alpine
+RUN apk update && apk add --no-cache curl && apk upgrade
+WORKDIR /app
+COPY --from=build /code/target/quarkus-app /app/
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "/app/quarkus-run.jar"]
