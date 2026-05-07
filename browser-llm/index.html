@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>PizzAI — Choose Runtime</title>
+  <title>PizzAI — Runtime wählen</title>
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -70,24 +70,24 @@
 <body>
 <header>
   <h1>🍕 PizzAI — Napoli Express</h1>
-  <p>All inference runs in your browser — nothing leaves your device. Pick your LLM runtime.</p>
+  <p>Alle Berechnungen laufen in deinem Browser — keine Daten verlassen dein Gerät. Wähle deine LLM-Runtime.</p>
 </header>
 <main>
   <a href="transformers.html" class="card">
     <div class="card-icon">🤗</div>
     <h2>Transformers.js</h2>
-    <p class="desc">Hugging Face ONNX Runtime — WebGPU accelerated with automatic WASM fallback. Works in most modern browsers.</p>
-    <p class="model">Model: <strong>SmolLM2-135M-Instruct</strong><br>~70 MB · cached after first visit</p>
+    <p class="desc">Hugging Face ONNX Runtime — WebGPU-beschleunigt mit automatischem WASM-Fallback. Funktioniert in den meisten modernen Browsern.</p>
+    <p class="model">Modell: <strong>Qwen2.5-1.5B-Instruct</strong><br>~900 MB · nach erstem Besuch gecacht</p>
     <span class="badge badge-hf">@huggingface/transformers</span>
   </a>
   <a href="webllm.html" class="card">
     <div class="card-icon">⚡</div>
     <h2>WebLLM</h2>
-    <p class="desc">MLC AI TVM-compiled runtime — OpenAI-compatible API. Requires WebGPU (Chrome or Edge on desktop).</p>
-    <p class="model">Model: <strong>SmolLM2-360M-Instruct</strong><br>~240 MB · cached after first visit</p>
+    <p class="desc">MLC AI TVM-kompilierte Runtime — OpenAI-kompatible API. Benötigt WebGPU (Chrome oder Edge auf Desktop).</p>
+    <p class="model">Modell: <strong>Qwen2.5-1.5B-Instruct</strong><br>~900 MB · nach erstem Besuch gecacht</p>
     <span class="badge badge-mlc">@mlc-ai/web-llm</span>
   </a>
 </main>
-<footer>Both runtimes run 100% client-side — no data leaves your device.</footer>
+<footer>Beide Runtimes laufen 100% clientseitig — keine Daten verlassen dein Gerät.</footer>
 </body>
 </html>

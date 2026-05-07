@@ -35,6 +35,16 @@ browser-llm-test: network
 	docker compose build pizzai-e2e
 	docker compose run --rm pizzai-e2e
 
+## browser-llm-storybook — run PizzAI prompt storybook (pipeline + inference)
+browser-llm-storybook: network
+	docker compose build pizzai-storybook
+	docker compose run --rm pizzai-storybook
+
+## browser-llm-storybook-pipeline — fast deterministic pipeline-only storybook
+browser-llm-storybook-pipeline: network
+	docker compose build pizzai-storybook
+	docker compose run --rm pizzai-storybook node dist/storybook/cli.js --layer pipeline
+
 browser-llm-down:
 	docker compose stop pizzai-web
 
@@ -42,4 +52,4 @@ browser-llm-down:
 down:
 	docker compose down --volumes
 
-.PHONY: network bigint-vs-uuid bulk-index-latency debezium-cdc browser-llm browser-llm-test browser-llm-down down
+.PHONY: network bigint-vs-uuid bulk-index-latency debezium-cdc browser-llm browser-llm-test browser-llm-storybook browser-llm-storybook-pipeline browser-llm-down down

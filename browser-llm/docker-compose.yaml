@@ -3,7 +3,17 @@ networks:
     name: docker-default-network
     external: true
 
+volumes:
+  hf-model-cache:
+
 services:
+  pizzai-storybook:
+    build:
+      context: .
+      dockerfile: Dockerfile.storybook
+    volumes:
+      - hf-model-cache:/cache/huggingface
+
   pizzai-e2e:
     build:
       context: .

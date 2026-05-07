@@ -1,0 +1,19 @@
+FROM node:22-slim
+
+WORKDIR /app
+
+COPY package.storybook.json ./package.json
+RUN npm install
+
+COPY tsconfig.storybook.json ./tsconfig.json
+COPY src/       src/
+COPY stories/   stories/
+COPY storybook/ storybook/
+
+RUN npx tsc
+
+ENV HF_HOME=/cache/huggingface
+ENV TRANSFORMERS_CACHE=/cache/huggingface
+ENV NODE_OPTIONS="--max-old-space-size=2048"
+
+CMD ["node", "dist/storybook/cli.js", "--layer", "both"]
