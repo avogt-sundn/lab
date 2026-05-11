@@ -277,7 +277,7 @@
 
 <div id="status-bar">
   <div class="dot loading" id="status-dot"></div>
-  <span id="progress-text">Lade Modell… (erster Besuch ~900 MB Download, danach gecacht)</span>
+  <span id="progress-text">Lade Modell…</span>
   <span id="runtime-badge">⚡ WebLLM</span>
 </div>
 <div id="dl-bar"><div id="dl-bar-fill"></div></div>
@@ -314,7 +314,20 @@
 <script type="module">
   import * as webllm from 'https://esm.run/@mlc-ai/web-llm';
 
-  const MODEL_ID = 'Qwen2.5-1.5B-Instruct-q4f16_1-MLC';
+  // ── Device-adaptive model selection ───────────────────────────────────────
+
+  const MODELS = {
+    mobile:  { id: 'Qwen2.5-0.5B-Instruct-q4f16_1-MLC', size: '~300 MB',  label: 'Qwen2.5-0.5B' },
+    desktop: { id: 'Qwen2.5-7B-Instruct-q4f16_1-MLC',   size: '~4 GB',   label: 'Qwen2.5-7B'   },
+  };
+
+  function detectDevice() {
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return 'mobile';
+    if (/Android/i.test(navigator.userAgent) && window.screen.width < 768) return 'mobile';
+    return 'desktop';
+  }
+
+  const selectedModel = MODELS[detectDevice()];
 
   // ── Business data ──────────────────────────────────────────────────────────
 
@@ -647,12 +660,14 @@ REGELN:
 
   async function init() {
     updateChips();
+    document.getElementById('runtime-badge').textContent = `⚡ ${selectedModel.label}`;
+    setStatus('loading', `Lade Modell ${selectedModel.label}… (erster Besuch ${selectedModel.size} Download, danach gecacht)`);
 
-    engine = await webllm.CreateMLCEngine(MODEL_ID, {
+    engine = await webllm.CreateMLCEngine(selectedModel.id, {
       initProgressCallback: (report) => {
         const pct = Math.round(report.progress * 100);
         dlBarFill.style.width = pct + '%';
-        setStatus('loading', report.text || `Loading — ${pct}%`);
+        setStatus('loading', report.text || `Lade — ${pct}%`);
       },
     });
 

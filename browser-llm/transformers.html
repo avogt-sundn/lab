@@ -278,7 +278,7 @@
 
 <div id="status-bar">
   <div class="dot loading" id="status-dot"></div>
-  <span id="progress-text">Lade Modell… (erster Besuch ~900 MB Download, danach gecacht)</span>
+  <span id="progress-text">Lade Modell…</span>
   <span id="runtime-badge">🤗 Transformers.js</span>
 </div>
 <div id="dl-bar"><div id="dl-bar-fill"></div></div>
@@ -317,6 +317,21 @@
 
   env.useBrowserCache = true;
   env.allowLocalModels = false;
+
+  // ── Device-adaptive model selection ───────────────────────────────────────
+
+  const MODELS = {
+    mobile:  { id: 'onnx-community/Qwen2.5-0.5B-Instruct', size: '~300 MB',  label: 'Qwen2.5-0.5B' },
+    desktop: { id: 'onnx-community/Qwen2.5-3B-Instruct',   size: '~1,8 GB', label: 'Qwen2.5-3B'   },
+  };
+
+  function detectDevice() {
+    if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) return 'mobile';
+    if (/Android/i.test(navigator.userAgent) && window.screen.width < 768) return 'mobile';
+    return 'desktop';
+  }
+
+  const selectedModel = MODELS[detectDevice()];
 
   // ── Business data ──────────────────────────────────────────────────────────
 
@@ -668,11 +683,13 @@ REGELN:
 
   async function init() {
     updateChips();
+    document.getElementById('runtime-badge').textContent = `🤗 ${selectedModel.label}`;
+    setStatus('loading', `Lade Modell ${selectedModel.label}… (erster Besuch ${selectedModel.size} Download, danach gecacht)`);
     try {
-      generator = await loadModel('onnx-community/Qwen2.5-1.5B-Instruct', 'webgpu');
+      generator = await loadModel(selectedModel.id, 'webgpu');
     } catch {
       setStatus('loading', 'WebGPU nicht verfügbar, falle auf WASM zurück…');
-      generator = await loadModel('onnx-community/Qwen2.5-1.5B-Instruct', 'wasm');
+      generator = await loadModel(selectedModel.id, 'wasm');
     }
 
     ready = true;

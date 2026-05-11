@@ -1,0 +1,1 @@
+- [browser-llm model selection for German inference](project_browser_llm_models.md) — Qwen2.5 chosen over SmolLM2; SmolLM2 unreliable for German even with explicit system prompt

@@ -77,16 +77,24 @@
     <div class="card-icon">🤗</div>
     <h2>Transformers.js</h2>
     <p class="desc">Hugging Face ONNX Runtime — WebGPU-beschleunigt mit automatischem WASM-Fallback. Funktioniert in den meisten modernen Browsern.</p>
-    <p class="model">Modell: <strong>Qwen2.5-1.5B-Instruct</strong><br>~900 MB · nach erstem Besuch gecacht</p>
+    <p class="model">Modell: <strong id="tj-model">…wird erkannt</strong><br><span id="tj-size"></span> · nach erstem Besuch gecacht</p>
     <span class="badge badge-hf">@huggingface/transformers</span>
   </a>
   <a href="webllm.html" class="card">
     <div class="card-icon">⚡</div>
     <h2>WebLLM</h2>
     <p class="desc">MLC AI TVM-kompilierte Runtime — OpenAI-kompatible API. Benötigt WebGPU (Chrome oder Edge auf Desktop).</p>
-    <p class="model">Modell: <strong>Qwen2.5-1.5B-Instruct</strong><br>~900 MB · nach erstem Besuch gecacht</p>
+    <p class="model">Modell: <strong id="wl-model">…wird erkannt</strong><br><span id="wl-size"></span> · nach erstem Besuch gecacht</p>
     <span class="badge badge-mlc">@mlc-ai/web-llm</span>
   </a>
+  <script>
+    const isMobile = /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+      (/Android/i.test(navigator.userAgent) && window.screen.width < 768);
+    document.getElementById('tj-model').textContent = isMobile ? 'Qwen2.5-0.5B' : 'Qwen2.5-3B';
+    document.getElementById('tj-size').textContent  = isMobile ? '~300 MB' : '~1,8 GB';
+    document.getElementById('wl-model').textContent = isMobile ? 'Qwen2.5-0.5B' : 'Qwen2.5-7B';
+    document.getElementById('wl-size').textContent  = isMobile ? '~300 MB' : '~4 GB';
+  </script>
 </main>
 <footer>Beide Runtimes laufen 100% clientseitig — keine Daten verlassen dein Gerät.</footer>
 </body>
